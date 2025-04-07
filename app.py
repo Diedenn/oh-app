@@ -1,16 +1,11 @@
 import streamlit as st
-from langchain_community.document_loaders import (
-    UnstructuredPDFLoader,
-    UnstructuredWordDocumentLoader,
-    UnstructuredExcelLoader
-)
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 import os
-import tempfile
 
 # --- SIDEBAR: Projektval och knowledge base ---
 st.sidebar.title("Upphandlingsprojekt")
@@ -32,18 +27,10 @@ def load_knowledge_base():
     kb_path = "project-data/customer-info"
     all_docs = []
     for file in os.listdir(kb_path):
-        ext = file.split('.')[-1].lower()
+        if not file.endswith(".pdf"):
+            continue
         file_path = os.path.join(kb_path, file)
-
-        if ext == "pdf":
-            loader = UnstructuredPDFLoader(file_path)
-        elif ext == "docx":
-            loader = UnstructuredWordDocumentLoader(file_path)
-        elif ext == "xlsx":
-            loader = UnstructuredExcelLoader(file_path)
-        else:
-            continue  # hoppa över andra filtyper
-
+        loader = PyMuPDFLoader(file_path)
         all_docs.extend(loader.load())
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -58,7 +45,7 @@ kb_vectorstore = load_knowledge_base()
 st.title("AI-verktyg för offentliga upphandlingar")
 st.header(f"Projekt: {selected_project}")
 
-uploaded_files = st.file_uploader("Ladda upp upphandlingsfiler (PDF, DOCX, XLSX)", type=["pdf", "docx", "xlsx"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Ladda upp upphandlingsfiler (PDF)", type=["pdf"], accept_multiple_files=True)
 
 if uploaded_files:
     project_path = f"{project_path_root}/{selected_project}/uploaded_files"
@@ -72,18 +59,10 @@ if uploaded_files:
 if st.button("🔍 Skapa upphandlingsstruktur"):
     full_text = ""
     for file in os.listdir(f"{project_path_root}/{selected_project}/uploaded_files"):
-        ext = file.split('.')[-1].lower()
-        file_path = os.path.join(f"{project_path_root}/{selected_project}/uploaded_files", file)
-
-        if ext == "pdf":
-            loader = UnstructuredPDFLoader(file_path)
-        elif ext == "docx":
-            loader = UnstructuredWordDocumentLoader(file_path)
-        elif ext == "xlsx":
-            loader = UnstructuredExcelLoader(file_path)
-        else:
+        if not file.endswith(".pdf"):
             continue
-
+        file_path = os.path.join(f"{project_path_root}/{selected_project}/uploaded_files", file)
+        loader = PyMuPDFLoader(file_path)
         pages = loader.load()
         full_text += "\n".join([page.page_content for page in pages])
 
