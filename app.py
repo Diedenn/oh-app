@@ -13,11 +13,14 @@ st.sidebar.title("Upphandlingsprojekt")
 project_name = st.sidebar.text_input("Namn på nytt projekt", "upphandling-1")
 create_project = st.sidebar.button("Skapa nytt projekt")
 
+project_path_root = "project-data/projects"
+os.makedirs(project_path_root, exist_ok=True)  # Skapa mapp om den inte finns
+
 if create_project:
-    os.makedirs(f"project-data/projects/{project_name}/uploaded_files", exist_ok=True)
+    os.makedirs(f"{project_path_root}/{project_name}/uploaded_files", exist_ok=True)
     st.sidebar.success(f"Projekt '{project_name}' skapat!")
 
-selected_project = st.sidebar.selectbox("Välj aktivt projekt", os.listdir("project-data/projects"))
+selected_project = st.sidebar.selectbox("Välj aktivt projekt", os.listdir(project_path_root))
 
 # --- Knowledge Base (engångsladdning) ---
 @st.cache_resource
@@ -43,7 +46,7 @@ st.header(f"Projekt: {selected_project}")
 uploaded_files = st.file_uploader("Ladda upp upphandlingsfiler (PDF)", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
-    project_path = f"project-data/projects/{selected_project}/uploaded_files"
+    project_path = f"{project_path_root}/{selected_project}/uploaded_files"
     os.makedirs(project_path, exist_ok=True)
     for file in uploaded_files:
         with open(os.path.join(project_path, file.name), "wb") as f:
@@ -53,8 +56,8 @@ if uploaded_files:
 # --- Generera struktur över upphandlingen ---
 if st.button("🔍 Skapa upphandlingsstruktur"):
     full_text = ""
-    for file in os.listdir(f"project-data/projects/{selected_project}/uploaded_files"):
-        loader = UnstructuredPDFLoader(os.path.join(f"project-data/projects/{selected_project}/uploaded_files", file))
+    for file in os.listdir(f"{project_path_root}/{selected_project}/uploaded_files"):
+        loader = UnstructuredPDFLoader(os.path.join(f"{project_path_root}/{selected_project}/uploaded_files", file))
         pages = loader.load()
         full_text += "\n".join([page.page_content for page in pages])
 
