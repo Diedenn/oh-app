@@ -5,6 +5,7 @@ openai
 faiss-cpu
 unstructured
 unstructured-inference
+pdf2image
 pypdf
 pdfminer.six
 python-docx
