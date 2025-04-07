@@ -6,4 +6,7 @@ faiss-cpu
 unstructured
 pypdf
 pdfminer.six
+python-docx
+openpyxl
+pi-heif
 python-magic-bin; platform_system == "Windows"
