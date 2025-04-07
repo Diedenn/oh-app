@@ -3,13 +3,6 @@ langchain
 langchain-community
 openai
 faiss-cpu
-unstructured
-unstructured-inference
-pdf2image
+pymupdf
 pypdf
 pdfminer.six
-python-docx
-openpyxl
-networkx
-pi-heif
-python-magic-bin; platform_system == "Windows"
