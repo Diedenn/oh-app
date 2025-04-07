@@ -2,10 +2,11 @@ import streamlit as st
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 import os
+import time
+from openai import RateLimitError
 
 # --- SIDEBAR: Projektval och knowledge base ---
 st.sidebar.title("Upphandlingsprojekt")
@@ -13,7 +14,7 @@ project_name = st.sidebar.text_input("Namn på nytt projekt", "upphandling-1")
 create_project = st.sidebar.button("Skapa nytt projekt")
 
 project_path_root = "project-data/projects"
-os.makedirs(project_path_root, exist_ok=True)  # Skapa mapp om den inte finns
+os.makedirs(project_path_root, exist_ok=True)
 
 if create_project:
     os.makedirs(f"{project_path_root}/{project_name}/uploaded_files", exist_ok=True)
@@ -21,7 +22,7 @@ if create_project:
 
 selected_project = st.sidebar.selectbox("Välj aktivt projekt", os.listdir(project_path_root))
 
-# --- Knowledge Base (engångsladdning) ---
+# --- Knowledge Base ---
 @st.cache_resource
 def load_knowledge_base():
     kb_path = "project-data/customer-info"
@@ -57,21 +58,32 @@ if uploaded_files:
 
 # --- Generera struktur över upphandlingen ---
 if st.button("🔍 Skapa upphandlingsstruktur"):
-    full_text = ""
+    llm = ChatOpenAI(model_name="gpt-4", temperature=0.2, max_tokens=2048)
+    chain = RetrievalQA.from_chain_type(llm=llm, retriever=kb_vectorstore.as_retriever(), chain_type="stuff")
+
+    structure_prompt = "Analysera följande text och identifiera alla delar som kräver fritextsvar i upphandlingen. Lista dem med rubriker."
+    summaries = []
+
     for file in os.listdir(f"{project_path_root}/{selected_project}/uploaded_files"):
         if not file.endswith(".pdf"):
             continue
+
         file_path = os.path.join(f"{project_path_root}/{selected_project}/uploaded_files", file)
         loader = PyMuPDFLoader(file_path)
         pages = loader.load()
-        full_text += "\n".join([page.page_content for page in pages])
+        content = "\n".join([p.page_content for p in pages])
 
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.2)
-    structure_prompt = "Analysera följande text och identifiera alla delar som kräver fritextsvar i upphandlingen. Lista dem med rubriker."
-    chain = RetrievalQA.from_chain_type(llm=llm, retriever=kb_vectorstore.as_retriever(), chain_type="stuff")
-    result = chain.run(f"{structure_prompt}\n\n{full_text}")
+        try:
+            result = chain.run(f"{structure_prompt}\n\n{content}")
+        except RateLimitError:
+            st.warning("Rate limit från OpenAI – väntar 20 sekunder...")
+            time.sleep(20)
+            result = chain.run(f"{structure_prompt}\n\n{content}")
+
+        summaries.append(f"### {file}\n{result}")
+
     st.subheader("📋 Föreslagen struktur")
-    st.write(result)
+    st.markdown("\n\n".join(summaries))
 
 # --- Fråga AI:n ---
 st.markdown("---")
@@ -79,9 +91,14 @@ st.subheader("🤖 Generera svar på upphandlingsfråga")
 user_query = st.text_area("Ställ din fråga eller klistra in en rubrik du vill svara på:")
 
 if st.button("✍️ Skriv svar") and user_query:
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.4)
+    llm = ChatOpenAI(model_name="gpt-4", temperature=0.4, max_tokens=2048)
     qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=kb_vectorstore.as_retriever())
-    answer = qa_chain.run(user_query)
+    try:
+        answer = qa_chain.run(user_query)
+    except RateLimitError:
+        st.warning("Rate limit från OpenAI – väntar 20 sekunder...")
+        time.sleep(20)
+        answer = qa_chain.run(user_query)
     st.text_area("Förslag på svar:", value=answer, height=300)
 
 # --- Footer ---
