@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain.document_loaders import PyPDFLoader
+from langchain.document_loaders import UnstructuredPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
 from langchain.embeddings.openai import OpenAIEmbeddings
@@ -26,7 +26,7 @@ def load_knowledge_base():
     all_docs = []
     for file in os.listdir(kb_path):
         if file.endswith(".pdf"):
-            loader = PyPDFLoader(os.path.join(kb_path, file))
+            loader = UnstructuredPDFLoader(os.path.join(kb_path, file))
             all_docs.extend(loader.load())
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_documents(all_docs)
@@ -54,7 +54,7 @@ if uploaded_files:
 if st.button("🔍 Skapa upphandlingsstruktur"):
     full_text = ""
     for file in os.listdir(f"project-data/projects/{selected_project}/uploaded_files"):
-        loader = PyPDFLoader(os.path.join(f"project-data/projects/{selected_project}/uploaded_files", file))
+        loader = UnstructuredPDFLoader(os.path.join(f"project-data/projects/{selected_project}/uploaded_files", file))
         pages = loader.load()
         full_text += "\n".join([page.page_content for page in pages])
 
