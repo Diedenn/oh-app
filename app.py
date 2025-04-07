@@ -56,34 +56,37 @@ if uploaded_files:
             f.write(file.getbuffer())
     st.success("Filer uppladdade!")
 
-# --- Generera struktur över upphandlingen ---
-if st.button("🔍 Skapa upphandlingsstruktur"):
-    llm = ChatOpenAI(model_name="gpt-4", temperature=0.2, max_tokens=2048)
-    chain = RetrievalQA.from_chain_type(llm=llm, retriever=kb_vectorstore.as_retriever(), chain_type="stuff")
-
-    structure_prompt = "Analysera följande text och identifiera alla delar som kräver fritextsvar i upphandlingen. Lista dem med rubriker."
-    summaries = []
-
-    for file in os.listdir(f"{project_path_root}/{selected_project}/uploaded_files"):
+# --- Skapa temporär vectorstore för uppladdade dokument ---
+def create_uploaded_docs_vectorstore(project_path):
+    all_docs = []
+    for file in os.listdir(project_path):
         if not file.endswith(".pdf"):
             continue
+        loader = PyMuPDFLoader(os.path.join(project_path, file))
+        all_docs.extend(loader.load())
 
-        file_path = os.path.join(f"{project_path_root}/{selected_project}/uploaded_files", file)
-        loader = PyMuPDFLoader(file_path)
-        pages = loader.load()
-        content = "\n".join([p.page_content for p in pages])
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    chunks = splitter.split_documents(all_docs)
+    embeddings = OpenAIEmbeddings()
+    vectorstore = FAISS.from_documents(chunks, embeddings)
+    return vectorstore
 
-        try:
-            result = chain.run(f"{structure_prompt}\n\n{content}")
-        except RateLimitError:
-            st.warning("Rate limit från OpenAI – väntar 20 sekunder...")
-            time.sleep(20)
-            result = chain.run(f"{structure_prompt}\n\n{content}")
-
-        summaries.append(f"### {file}\n{result}")
-
-    st.subheader("📋 Föreslagen struktur")
-    st.markdown("\n\n".join(summaries))
+# --- Generera struktur över upphandlingen ---
+if st.button("🔍 Skapa upphandlingsstruktur"):
+    st.info("Bearbetar dokument och genererar struktur...")
+    try:
+        uploaded_vectorstore = create_uploaded_docs_vectorstore(f"{project_path_root}/{selected_project}/uploaded_files")
+        llm = ChatOpenAI(model_name="gpt-4", temperature=0.2, max_tokens=2048)
+        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=uploaded_vectorstore.as_retriever())
+        result = qa_chain.run("Identifiera vilka delar av dokumenten som kräver fritextsvar eller beskrivningar.")
+        st.subheader("📋 Föreslagen struktur")
+        st.markdown(result)
+    except RateLimitError:
+        st.warning("Rate limit från OpenAI – väntar 20 sekunder...")
+        time.sleep(20)
+        result = qa_chain.run("Identifiera vilka delar av dokumenten som kräver fritextsvar eller beskrivningar.")
+        st.subheader("📋 Föreslagen struktur")
+        st.markdown(result)
 
 # --- Fråga AI:n ---
 st.markdown("---")
