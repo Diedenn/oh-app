@@ -9,4 +9,5 @@ pdfminer.six
 python-docx
 openpyxl
 pi-heif
+networkx
 python-magic-bin; platform_system == "Windows"
