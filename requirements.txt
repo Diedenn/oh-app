@@ -2,5 +2,7 @@ streamlit
 langchain
 openai
 faiss-cpu
-pypdf
 unstructured
+pypdf
+pdfminer.six
+python-magic-bin; platform_system == "Windows"
